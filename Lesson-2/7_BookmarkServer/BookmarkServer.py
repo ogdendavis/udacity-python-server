@@ -69,9 +69,11 @@ form = '''<!DOCTYPE html>
 
 def CheckURI(uri, timeout=5):
     # 1. Write this function
+    if uri[:4] != "http":
+        uri = "http://" + uri
     try:
         checkURI = requests.get(uri, timeout=timeout)
-    except requests.exceptions.MissingSchema:
+    except (requests.exceptions.MissingSchema, requests.exceptions.ConnectionError):
         return False
     return checkURI.ok
 
@@ -84,16 +86,18 @@ class Shortener(http.server.BaseHTTPRequestHandler):
 
         if name:
             if name in memory:
-                # 2. Send a 303 redirect to the long URI in memory[name].
+                valid_path = memory[name]
+                if valid_path[:4] != "http":
+                    valid_path = "http://" + valid_path
                 self.send_response(303)
-                self.send_header('location', memory[name])
+                self.send_header('location', valid_path)
                 self.end_headers()
             else:
                 # We don't know that name! Send a 404 error.
                 self.send_response(404)
                 self.send_header('Content-type', 'text/plain; charset=utf-8')
                 self.end_headers()
-                self.wfile.write("I don't know '{}'.".format(name).encode())
+                self.wfile.write("I don't know '{}'. {}".format(name, memory).encode())
         else:
             # Root path. Send the form.
             self.send_response(200)
